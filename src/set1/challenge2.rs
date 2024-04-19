@@ -1,11 +1,9 @@
-use super::{decode_hex, encode_hex};
-
-
+use super::{decode_hex_bad, encode_hex};
 
 #[allow(dead_code)]
-fn fixed_xor(seq1: &str, seq2: &str) -> String {
+pub fn fixed_xor(seq1: &str, seq2: &str) -> String {
     
-    let result : Vec<u8> = decode_hex(&seq1).zip(decode_hex(&seq2))
+    let result : Vec<u8> = decode_hex_bad(&seq1).zip(decode_hex_bad(&seq2))
                                 .map(|(b1, b2)| b1 ^ b2)
                                 .collect();
     encode_hex(result)
