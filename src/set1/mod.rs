@@ -2,6 +2,7 @@
 mod challenge1;
 mod challenge2;
 mod challenge3;
+mod challenge4;
 
 #[allow(dead_code)]
 fn byte_hex_to_raw(digit: u8) -> u8

@@ -15,21 +15,22 @@
 
 
 use std::{cmp::Ordering, collections::HashMap, fmt::Display, fs, iter::repeat};
+use Ordering::{Less, Greater};
 
 use super::decode_hex;
 
 type FreqCountMap = HashMap<u8, u64>;
-type FreqMap = HashMap<u8, f64>;
+pub type FreqMap = HashMap<u8, f64>;
 
 #[allow(dead_code)]
-fn analyse(s: &mut impl Iterator<Item = u8>) -> FreqMap {
+pub fn analyse(s: &Vec<u8>) -> FreqMap {
     let mut map : FreqCountMap = HashMap::new();
 
     // Only count ascii letter
     let letters : Vec<_> = (u8::MIN..b'~').collect();
     let mut total_letters = 0;
 
-    for byte in s.filter(|b| letters.contains(b)) {
+    for &byte in s.iter().filter(|b| letters.contains(b)) {
         map.entry(byte)
             .and_modify(|f| *f += 1)
             .or_insert(1);
@@ -45,17 +46,16 @@ fn analyse(s: &mut impl Iterator<Item = u8>) -> FreqMap {
     freq_map
 }
 
-
 #[allow(dead_code)]
-fn score(cipher_m: &FreqMap, reference_m: &FreqMap) -> f64 {
-    let mut error = 0_f64;
-    for (key, freq) in cipher_m.into_iter() {
-        error += match reference_m.get(key) {
-            Some(&ref_freq) => f64::abs(ref_freq - freq),
-            None => 0.1
-        }
-    }
-    error
+pub fn score(cipher_m: &FreqMap, reference_m: &FreqMap) -> f64 {
+    cipher_m
+        .into_iter()
+        .map(|(key, freq)| {
+            match reference_m.get(key) {
+                Some(&ref_freq) => f64::abs(ref_freq - freq),
+                None => 0.1_f64
+            }
+        }).sum()
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -79,15 +79,15 @@ fn single_byte_xor(cipher: &str) -> Vec<Result>  {
     let root = env!("CARGO_MANIFEST_DIR");
     let file_path = format!("{root}/assets/pg61.txt");
     let book = fs::read_to_string(file_path).expect("Book not found !");
+    let book_vec: Vec<_> = book.as_bytes().into();
 
-    let book_freqmap = analyse(&mut book.bytes());
-    // let cipher_freqmap = analyse(&cipher.bytes());
+    let book_freqmap = analyse(&book_vec);
     let cipher: Vec<_> = decode_hex(cipher);
 
     let mut results: Vec<Result> = vec![];
 
     // xor with 0 changes nothing, do we still wanna keep it here lol
-    for key in u8::MIN..=u8::MAX {
+    for key in u8::MIN+1..=u8::MAX {
         let full_key = std::iter::repeat(key);
 
         // xor `ciper` with every byte 
@@ -101,7 +101,7 @@ fn single_byte_xor(cipher: &str) -> Vec<Result>  {
             Err(_) => continue
         };
 
-        let c_f = analyse(&mut xored.into_iter());
+        let c_f = analyse(&xored);
         let err = score(&c_f, &book_freqmap);
 
         results.push(Result { error: err, key, plaintext: ascii });
@@ -109,12 +109,7 @@ fn single_byte_xor(cipher: &str) -> Vec<Result>  {
     }
 
     results.sort_by(|a, b| {
-        if a.error < b.error {
-            Ordering::Less
-        }
-        else {
-            Ordering::Greater
-        }
+        if a.error < b.error { Less } else { Greater }
     });
     // best_match
     results
@@ -124,16 +119,12 @@ fn single_byte_xor(cipher: &str) -> Vec<Result>  {
 
 #[allow(dead_code)]
 fn brute_force(cipher: &str) -> Vec<(String, u8)> {
-    // let cipher = cipher.as_bytes();
-    let cipher: Vec<_> = decode_hex(cipher);
-    // let len = cipher.len();
 
+    let cipher: Vec<_> = decode_hex(cipher);
     let mut results: Vec<(String, u8)> = Vec::new();
 
     for key in 0..127_u8 {
-        // let full_key: Vec<_> = repeat(key).take(len).collect();
         let full_key= repeat(key);
-        // xor both
         let xored: Vec<u8> = cipher.iter().zip(full_key).map(|(c, b)| c ^ b).collect();
         
         match String::from_utf8(xored) {
@@ -150,12 +141,6 @@ fn brute_force(cipher: &str) -> Vec<(String, u8)> {
 #[test]
 fn test_freq_anal() {
     let res = single_byte_xor("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736");
-
-    // for i in res {
-    //     if ! i.plaintext.contains([0xa as char, 0xd as char, 0xc as char, 0xb as char]) {
-    //         println!("{i}");
-    //     }
-    // }
 
     assert_eq!(res[0].plaintext, "Cooking MC's like a pound of bacon");
 }
